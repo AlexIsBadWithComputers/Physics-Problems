@@ -1,6 +1,9 @@
 program ising
 !This computes an ising model for a theoretical magnet slab
 !at various temperatures. I didn't comment very well. sorry.
+!but it uses metropolis-hastings to decide if the spins flip or not
+!Although I like to call it one temperature simulated annealing because
+!i'm a rule breaker
 implicit none
 integer::siz,sweeps,i,j
 real(kind = 8),allocatable,dimension(:)::en,men,magn,mmagn
