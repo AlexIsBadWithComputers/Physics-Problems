@@ -97,6 +97,7 @@ real(kind = 8) function boundaries(s,i,j)
   boundaries = s(xind,yind)
 end function boundaries
 
+!calculates delta as defined below
 real(kind = 8) function delt(s,i,j)
   implicit none
   real(kind = 8),dimension(:,:),intent(in)::S
@@ -113,7 +114,7 @@ real(kind = 8) function delt(s,i,j)
 end function delt
 
 
-
+!calculates total energy of the magnet
 
 real(kind = 8) function ToToNRG(s)
   implicit none
@@ -128,7 +129,7 @@ real(kind = 8) function ToToNRG(s)
   end do
   ToToNRG = tot
 end function ToToNRG
-
+! magnetizm of the magnet
 real(kind = 8) function magnetizm(s)
   implicit none
   real(kind = 8), dimension(:,:), intent(in)::s
