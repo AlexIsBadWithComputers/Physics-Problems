@@ -1,12 +1,14 @@
 program ising
+!This computes an ising model for a theoretical magnet slab
+!at various temperatures. I didn't comment very well. sorry.
 implicit none
 integer::siz,sweeps,i,j
 real(kind = 8),allocatable,dimension(:)::en,men,magn,mmagn
 real(kind = 8),dimension(4)::temp
 
 temp = (/3.0,2.5,2.25,1.0/)
-siz = 32
-sweeps = 100000
+siz = 32 
+sweeps = 100000 
 open(16, file = "isingtest.txt")
 
 allocate(en(sweeps),men(sweeps),magn(sweeps),mmagn(sweeps))
