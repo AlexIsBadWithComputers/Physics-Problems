@@ -1,3 +1,5 @@
+!This program solves the traditional birthday problem with monte-carlo methods
+
 program birthday
 implicit none
 integer:: i,homies,trials,j,k,success
@@ -6,6 +8,7 @@ real::draw
 !classic birthday problem
 success = 0
 homies = 30
+!Number of trials hardcoded
 trials = 1000000
 allocate(dat(homies))
 call random_seed()
