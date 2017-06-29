@@ -1,5 +1,6 @@
 program schemes
 !	use other
+! This program sets up the grids to solve the PDE problems using the module.
 	use godunov_flux
 	implicit none
 	real(kind = 8),dimension(1002) :: p, u,c
