@@ -3,12 +3,144 @@ module ngf
 
 
 contains
+! The Alex-Special Lax-Wendrov PDE solver for SOD shock tube problems.
+! Note this has crazy Gibbs phenomena on discontinuities, although 
+! that's just the nature of Lax-Wendrov.
+! also note you'll have to set up the grid that calls these functions in order to actualy solve any problems. 
+
+subroutine LW(gp,uf,u,c,p,totaltime)
+		implicit none
+		integer::i,j,n,k
+		real(kind=8),intent(in)::totaltime
+		integer,intent(in)::gp! number of grid points
+		real(kind = 8):: t,gamma,tmax,length,r,pr,e,press,dt,dx
+		real(kind = 8),dimension(gp + 2),intent(out):: p,c,u !u is speed, c is sound speed
+		real(kind = 8),dimension(gp+ 2,3), intent(out)::uf
+		real(kind =8),dimension(gp + 2,3):: newuf
+		real(kind = 8),dimension(gp + 2,3)::F   !fluxes       
+		real(kind = 8), parameter :: eps=1E-15, CFL = 0.5
+
+
+
+		!initial conditions/known things
+		
+		gamma = 1.4d0
+		!fill from the left
+		do i = 1,nint(1.0*gp/2) !boundary condition are farther cause it big
+			uf(i,1) = 10.**5
+			p(i) = 1.0
+			uf(i,2) = uf(i,1) * u(i)
+			u(i) = 0.0
+			c(i) = sqrt(gamma * p(i)/uf(i,1))
+			uf(i,3) = p(i)/(gamma-1.)
+		end do
+			
+		do i = nint(1.0*gp/2)+1,gp +  2
+			uf(i,1) = 1.25 * 10 ** 4
+			p(i) = 0.1
+			u(i) = 0.0
+			uf(i,2) = uf(i,1) * u(i)
+			uf(i,3) =p(i)/(gamma-1.) 
+			c(i) = sqrt(gamma * p(i)/uf(i,1))
+
+		end do 
+		length = 1.0
+		dx =.01! length/(gp -1.)
+		t = 0. 
+		F = 0.
+		newuf = 0.
+
+		
+		do while(t .lt. totaltime) 
+			dt = CFL * dx/maxval(c(:))
+
+			t = t + dt
+					
+			do j = 1,gp+1
+				r = uf(j,1)
+				pr = uf(j,2) !pr is rho r, the second term in the equations
+				e = uf(j,3)
+				press = (gamma - 1.) * (e - 0.5 * pr * pr / r  )
+				F(j,1) = pr 
+				F(j,2) = pr * pr / r + press
+				F(j,3) = pr / r * (e + press) 
+			
+			end do
+
+			!Now we need to find the half steps
+			do j = 1,gp+1
+				do i = 1,3
+					newuf(j,i) =  0.5 * (uf(j + 1, i) + uf(j, i)) - 0.5 * dt/dx * (F(j + 1,i) - F(j,i))
+				end do
+			end do
+			call reflectivebc(newuf,gp+2)
+			
+
+			!Now, we need half step of flux for the next part
+			do j = 1,gp+1
+				r = newuf(j,1)
+				pr = newuf(j,2) !pr is rho r, the second term in the equations
+				e = newuf(j,3)
+				press = (gamma - 1.) * (e - 0.5 * pr * pr / r  )
+
+				F(j,1) = pr 
+				F(j,2) = pr * pr / r + press
+				F(j,3) = pr / r * (e + press) 
+				
+			end do
+				
+			!Now we need to update using those half steps as well
+			do j = 2,gp
+				do i = 1,3
+					newuf(j,i) =uf(j,i) - 0.5 * dt/dx * (F(j,i) - F(j-1,i))
+				end do
+			end do
+			!Now we need to update my man uf
+
+			do j =2,gp
+				do i = 1,3
+					uf(j,i) = newuf(j,i)
+				end do
+		!	print*, uf(j,1), uf(j,2), uf(j,3),k,j
+			end do
+
+			do j = 2,gp
+				u(j) = uf(j,2)/uf(j,1)    !calculate your other shit.
+				p(j) = press
+				c(j) = sqrt(gamma * abs(p(j))/uf(j,1))
+			end do	
+			print*, maxval(c(:)),dt,"DFD"
+		end do		
+		
+	end subroutine LW
+
+	
+	!This is for the Lax wenrov
+	subroutine reflectivebc(U,n)
+		implicit none
+		integer,intent(in)::n
+		real(kind = 8),dimension(n,3),intent(inout) :: U
+
+		U(1,1) = U(2,1)
+		U(1,2) = - U(2,2)
+		U(1,3) = U(2,3)
+		U(n-1,1) = U(n-2,1) 
+		U(n-1,2) = -U(n-2,2) 
+		U(n-1,3) = U(n-2,3) 
+	end subroutine
+
+
+
+
+
 	!computes Godunov flux. This is a rewritten version of the codes available online at 
 	!http://www.cfdbooks.com/cfdcodes/oned_euler_fluxes_v5.f90
-	!Those suckers were used as guidance, but didn't work in their "as is formulation" so 
+	!Those were used as guidance, but didn't work in their "as is formulation" so 
 	!This is the Alex rewrite which made them work with gfortran.
 	!also double precision. I also fixed some style things as well as removed some pointless
 	!sections that didn't do what they needed to based on a direct copy paste. 
+	! Note you'll have to set up the grid for this function yourself in order to use this.
+	! This is simply a solver, not a grid tuned to your problem.
  
  function God(uL,uR)
 		implicit none
@@ -213,7 +345,7 @@ function VanLeer(uL,uR)
 
  end function pf
 
-
+! Computes the 'mass flux' 
 function massflux(r,c,pQ,pm)
  	 real(kind = 8) :: r,c,pQ,pm !  Input
  	 real(kind = 8) :: massflux  ! Output
@@ -231,6 +363,7 @@ function massflux(r,c,pQ,pm)
      endif
   end function massflux
 
+! find speed/maxspeed in your medium
 	subroutine sonic(US1,US2,US3, u1,c1,P1,u2,c2,a1,a2)
   		real(kind = 8) :: u1,c1,P1,u2,c2,a1,a2 ! Input
   		real(kind = 8) :: US1,US2,US3          ! Output
@@ -253,130 +386,6 @@ function massflux(r,c,pQ,pm)
 
   end subroutine sonic
 
-
-!This is my accidental lax-wendrov. I wrote it by accident and I figured why not use it.
-
-
-subroutine LW(gp,uf,u,c,p,totaltime)
-		implicit none
-		integer::i,j,n,k
-		real(kind=8),intent(in)::totaltime
-		integer,intent(in)::gp! number of grid points
-		real(kind = 8):: t,gamma,tmax,length,r,pr,e,press,dt,dx
-		real(kind = 8),dimension(gp + 2),intent(out):: p,c,u !u is speed, c is sound speed
-		real(kind = 8),dimension(gp+ 2,3), intent(out)::uf
-		real(kind =8),dimension(gp + 2,3):: newuf
-		real(kind = 8),dimension(gp + 2,3)::F   !fluxes       
-		real(kind = 8), parameter :: eps=1E-15, CFL = 0.5
-
-
-
-		!initial conditions/known things
-		
-		gamma = 1.4d0
-		!fill from the left
-		do i = 1,nint(1.0*gp/2) !boundary condition are farther cause it big
-			uf(i,1) = 10.**5
-			p(i) = 1.0
-			uf(i,2) = uf(i,1) * u(i)
-			u(i) = 0.0
-			c(i) = sqrt(gamma * p(i)/uf(i,1))
-			uf(i,3) = p(i)/(gamma-1.)
-		end do
-			
-		do i = nint(1.0*gp/2)+1,gp +  2
-			uf(i,1) = 1.25 * 10 ** 4
-			p(i) = 0.1
-			u(i) = 0.0
-			uf(i,2) = uf(i,1) * u(i)
-			uf(i,3) =p(i)/(gamma-1.) 
-			c(i) = sqrt(gamma * p(i)/uf(i,1))
-
-		end do 
-		length = 1.0
-		dx =.01! length/(gp -1.)
-		t = 0. 
-		F = 0.
-		newuf = 0.
-
-		
-		do while(t .lt. totaltime) 
-			dt = CFL * dx/maxval(c(:))
-
-			t = t + dt
-					
-			do j = 1,gp+1
-				r = uf(j,1)
-				pr = uf(j,2) !pr is rho r, the second term in the equations
-				e = uf(j,3)
-				press = (gamma - 1.) * (e - 0.5 * pr * pr / r  )
-				F(j,1) = pr 
-				F(j,2) = pr * pr / r + press
-				F(j,3) = pr / r * (e + press) 
-			
-			end do
-
-			!Now we need to find the half steps
-			do j = 1,gp+1
-				do i = 1,3
-					newuf(j,i) =  0.5 * (uf(j + 1, i) + uf(j, i)) - 0.5 * dt/dx * (F(j + 1,i) - F(j,i))
-				end do
-			end do
-			call reflectivebc(newuf,gp+2)
-			
-
-			!Now, we need half step of flux for the next part
-			do j = 1,gp+1
-				r = newuf(j,1)
-				pr = newuf(j,2) !pr is rho r, the second term in the equations
-				e = newuf(j,3)
-				press = (gamma - 1.) * (e - 0.5 * pr * pr / r  )
-
-				F(j,1) = pr 
-				F(j,2) = pr * pr / r + press
-				F(j,3) = pr / r * (e + press) 
-				
-			end do
-				
-			!Now we need to update using those half steps as well
-			do j = 2,gp
-				do i = 1,3
-					newuf(j,i) =uf(j,i) - 0.5 * dt/dx * (F(j,i) - F(j-1,i))
-				end do
-			end do
-			!Now we need to update my man uf
-
-			do j =2,gp
-				do i = 1,3
-					uf(j,i) = newuf(j,i)
-				end do
-		!	print*, uf(j,1), uf(j,2), uf(j,3),k,j
-			end do
-
-			do j = 2,gp
-				u(j) = uf(j,2)/uf(j,1)    !calculate your other shit.
-				p(j) = press
-				c(j) = sqrt(gamma * abs(p(j))/uf(j,1))
-			end do	
-			print*, maxval(c(:)),dt,"DFD"
-		end do		
-		
-	end subroutine LW
-
-	
-	!This is for the Lax wenrov
-	subroutine reflectivebc(U,n)
-		implicit none
-		integer,intent(in)::n
-		real(kind = 8),dimension(n,3),intent(inout) :: U
-
-		U(1,1) = U(2,1)
-		U(1,2) = - U(2,2)
-		U(1,3) = U(2,3)
-		U(n-1,1) = U(n-2,1) 
-		U(n-1,2) = -U(n-2,2) 
-		U(n-1,3) = U(n-2,3) 
-	end subroutine
 
 
 
