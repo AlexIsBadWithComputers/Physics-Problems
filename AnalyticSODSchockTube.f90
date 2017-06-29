@@ -1,3 +1,6 @@
+! This was used to solve the analytic shock tube problem with NR. This is heavily (and sarcastically) commente
+! it was distributed as an example for a class I was taking. 
+
 program tube
 	use nr
 	implicit none
@@ -9,11 +12,12 @@ program tube
 	common/ihatemylife/ pr,pl,rhol,rhor,gamma !this is so I can use NR.
 	
 
-	!This stupid thing solves the exact stupid tube thing with root finding and all that junk. These equations are
+	!This solves the exact shock tube problem with root finding rather than a PDE solver. These equations are
 	!all available on Wikipedia, feel free to look at them. Alternatively, if you don't care, feel free to compile
 	!this and toss it in your lab all willy-nilly and act like you did it. That's cool. I won't be hurt. 
 	!also see http://cococubed.asu.edu/codes/riemann/exact_riemann.f for a similar F77 code if you care
-	!this is essentially the same, because I was using it as guidance (cheesing). However I call nr and cut out 
+	!this is essentially the same because it's actually very difficult to find these equations
+	!actually written down. However I call nr and cut out 
 	!a lot of the error checking because I'm a rule breaker. Also, besides "r" and "l", everything else
 	!is indexed by region. 
 
@@ -82,7 +86,7 @@ program tube
 	rho3 = rhol * (p3/pl)**(1./gamma)
 
 	!But wait! There's more! Waves! lkasjdf;laksjdfa;lksdjfa;sdf
-	!Note this assumes the conditions I've given above if pr>pl, this will do stuff, but the wrong stuff
+	! Note this assumes the conditions I've given above if pr>pl, this will do stuff, but the wrong stuff
 
 	cl = sqrt(gamma*pl/rhol)
 	c3 = sqrt(gamma*p3/rho3)
@@ -95,15 +99,15 @@ program tube
      
      print*, xhd, xft,cl, xdis,t
      !Alright. So I bet you're like "Wow Alex! This has to be almost finished!"
-     !Well honestly, you're entriely wrong. We have to do this crap again a bunch of times. It sucks
-     !So here is a whole bunch o stuff that does that. Essentially the above acts as boundary conditions.
+     !Well honestly, you're entriely wrong. We have to do this again a bunch of times. It sucks
+     !So here is a whole bunch o' stuff that does that. Essentially the above acts as boundary conditions.
 
      dx = (xr - xl)/(size(x) - 1)
      do i = 1,size(x)
      	x(i) = xl + dx * (i - 1)
    
      end do
-     !essentially though, this applies the formulae on Wikipedea or the other refferences to the appropriate location. NBD.
+     ! This applies the formulae on Wikipedea or the other refferences to the appropriate location. NBD.
      
      do i = 1, size(x) !Just change it above if you want more points. 
      	if(x(i) .lt. xhd) then
